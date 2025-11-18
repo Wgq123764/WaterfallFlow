@@ -14,6 +14,8 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
+import java.lang.reflect.Field;
+import android.util.Log;
 
 public class HomeFragment extends Fragment {
     private RecyclerView recyclerView;
@@ -97,9 +99,53 @@ public class HomeFragment extends Fragment {
         return max;
     }
 
+
+    private List<Integer> getAllImageDrawables() {
+        List<Integer> drawableList = new ArrayList<>();
+
+        try {
+            Field[] fields = R.drawable.class.getFields();
+
+            for (Field field : fields) {
+                String fieldName = field.getName();
+
+                // 排除系统自带的图标
+                if (fieldName.startsWith("ic_launcher") ||
+                        fieldName.startsWith("ic_menu") ||
+                        fieldName.equals("ic_launcher_foreground") ||
+                        fieldName.equals("ic_launcher_background")) {
+                    continue;
+                }
+
+                // 尝试获取资源ID
+                try {
+                    int resId = field.getInt(null);
+                    drawableList.add(resId);
+                    Log.d("DrawableLoader", "Found image: " + fieldName);
+                } catch (Exception e) {
+                    // 忽略无法访问的字段
+                }
+            }
+        } catch (Exception e) {
+            Log.e("DrawableLoader", "Error accessing R.drawable class: " + e.getMessage());
+        }
+
+        Log.d("DrawableLoader", "Total images found: " + drawableList.size());
+        return drawableList;
+    }
+
     private void loadData(int page) {
         Random random = new Random();
-        int[] imageResources = {R.drawable.ic_launcher_foreground};
+
+        // 自动获取所有图片资源
+        List<Integer> imageResources = getAllImageDrawables();
+
+        // 如果没有找到图片，使用默认图标
+        if (imageResources.isEmpty()) {
+            imageResources.add(R.drawable.ic_launcher_foreground);
+            Log.w("HomeFragment", "No custom images found, using default icon");
+        }
+
         String[] titles = {"美丽风景", "城市风光", "自然奇观", "人文建筑", "动物世界"};
         String[] descriptions = {
                 "这是一段描述文字，展示瀑布流布局的效果",
@@ -112,7 +158,11 @@ public class HomeFragment extends Fragment {
         int itemsPerPage = 10;
         for (int i = 0; i < itemsPerPage; i++) {
             int index = (page - 1) * itemsPerPage + i;
-            int imageRes = imageResources[0];
+
+            // 从可用图片列表中随机选择
+            int randomIndex = random.nextInt(imageResources.size());
+            int imageRes = imageResources.get(randomIndex);
+
             String title = titles[i % titles.length] + " " + index;
             String description = descriptions[i % descriptions.length];
             int height = 400 + random.nextInt(300);
@@ -134,3 +184,4 @@ public class HomeFragment extends Fragment {
         }, 1500);
     }
 }
+
