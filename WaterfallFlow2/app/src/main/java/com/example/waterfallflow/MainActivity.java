@@ -28,6 +28,7 @@ public class MainActivity extends AppCompatActivity {
         bottomNavigationView = findViewById(R.id.bottom_navigation);
     }
 
+    // 修改MainActivity.java中的setupBottomNavigation方法
     private void setupBottomNavigation() {
         bottomNavigationView.setOnItemSelectedListener(item -> {
             Fragment selectedFragment = null;

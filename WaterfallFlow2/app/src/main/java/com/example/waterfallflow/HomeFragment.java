@@ -1,10 +1,14 @@
 package com.example.waterfallflow;
 
+import android.content.res.Resources;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.Button;
+import android.widget.RadioGroup;
+import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
@@ -18,12 +22,25 @@ import java.lang.reflect.Field;
 import android.util.Log;
 
 public class HomeFragment extends Fragment {
+
     private RecyclerView recyclerView;
     private WaterfallAdapter adapter;
     private List<Item> itemList;
     private SwipeRefreshLayout swipeRefreshLayout;
+    private RadioGroup layoutRadioGroup;
+    private Button applyButton;
+
+    // 当前布局列数和分页相关
+    private int currentSpanCount = 2;
     private int currentPage = 1;
     private boolean isLoading = false;
+    private boolean isRefreshing = false;
+
+    // 优化设置 - 方案四
+    private static final int INITIAL_PAGES = 3;     // 初始加载3页
+    private static final int ITEMS_PER_PAGE = 15;   // 每页15个项目
+    private static final int PRELOAD_THRESHOLD = 6; // 提前预加载阈值
+    private static final int MAX_PAGES = 8;         // 最大页数减少
 
     @Nullable
     @Override
@@ -33,6 +50,7 @@ public class HomeFragment extends Fragment {
         initView(view);
         initData();
         setupRecyclerView();
+        setupLayoutSwitcher();
         setupRefresh();
         setupLoadMore();
 
@@ -42,31 +60,76 @@ public class HomeFragment extends Fragment {
     private void initView(View view) {
         recyclerView = view.findViewById(R.id.recycler_view);
         swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
+        layoutRadioGroup = view.findViewById(R.id.layout_radio_group);
+        applyButton = view.findViewById(R.id.apply_button);
     }
 
     private void initData() {
         itemList = new ArrayList<>();
-        loadData(1);
+        // 初始加载多页数据，避免频繁加载
+        for (int i = 1; i <= INITIAL_PAGES; i++) {
+            loadHomeData(i);
+        }
+        currentPage = INITIAL_PAGES;
     }
 
     private void setupRecyclerView() {
-        StaggeredGridLayoutManager layoutManager =
-                new StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL);
-        recyclerView.setLayoutManager(layoutManager);
+        updateLayoutManager(currentSpanCount);
 
         adapter = new WaterfallAdapter(itemList);
+
+        // 设置点击监听器
+        adapter.setOnItemClickListener((item, position) -> {
+            ImageDetailFragment detailFragment = ImageDetailFragment.newInstance(
+                    item.getImageResId(),
+                    item.getTitle()
+            );
+
+            getParentFragmentManager().beginTransaction()
+                    .setReorderingAllowed(true)
+                    .addToBackStack("image_detail")
+                    .replace(R.id.fragment_container, detailFragment)
+                    .commit();
+        });
+
         recyclerView.setAdapter(adapter);
+    }
+
+    private void setupLayoutSwitcher() {
+        // 设置默认选中双列布局
+        layoutRadioGroup.check(R.id.radio_double_column);
+
+        layoutRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
+            if (checkedId == R.id.radio_single_column) {
+                currentSpanCount = 1;
+            } else if (checkedId == R.id.radio_double_column) {
+                currentSpanCount = 2;
+            } else if (checkedId == R.id.radio_three_column) {
+                currentSpanCount = 3;
+            }
+        });
+
+        applyButton.setOnClickListener(v -> {
+            updateLayoutManager(currentSpanCount);
+            Toast.makeText(getContext(), "已切换到" + getLayoutName(currentSpanCount) + "布局", Toast.LENGTH_SHORT).show();
+        });
     }
 
     private void setupRefresh() {
         swipeRefreshLayout.setOnRefreshListener(() -> {
-            // 模拟网络请求延迟
-            new Handler().postDelayed(() -> {
-                currentPage = 1;
-                itemList.clear();
-                loadData(currentPage);
-                swipeRefreshLayout.setRefreshing(false);
-            }, 1000);
+            if (!isRefreshing) {
+                isRefreshing = true;
+                // 模拟网络请求延迟
+                new Handler().postDelayed(() -> {
+                    currentPage = 1;
+                    itemList.clear();
+                    // 刷新时只加载第一页，避免刷新时间过长
+                    loadHomeData(1);
+                    swipeRefreshLayout.setRefreshing(false);
+                    isRefreshing = false;
+                    Toast.makeText(getContext(), "刷新完成", Toast.LENGTH_SHORT).show();
+                }, 1000);
+            }
         });
     }
 
@@ -76,14 +139,22 @@ public class HomeFragment extends Fragment {
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
                 super.onScrolled(recyclerView, dx, dy);
 
-                StaggeredGridLayoutManager layoutManager = (StaggeredGridLayoutManager) recyclerView.getLayoutManager();
-                int[] lastVisibleItemPositions = layoutManager.findLastVisibleItemPositions(null);
-                int lastVisibleItem = getLastVisibleItem(lastVisibleItemPositions);
-                int totalItemCount = layoutManager.getItemCount();
+                // 添加页数限制检查
+                if (currentPage >= MAX_PAGES) {
+                    return;
+                }
 
-                if (!isLoading && lastVisibleItem >= totalItemCount - 5) {
-                    loadMoreData();
-                    isLoading = true;
+                StaggeredGridLayoutManager layoutManager = (StaggeredGridLayoutManager) recyclerView.getLayoutManager();
+                if (layoutManager != null && !isLoading && !isRefreshing) {
+                    int[] lastVisibleItemPositions = layoutManager.findLastVisibleItemPositions(null);
+                    int lastVisibleItem = getLastVisibleItem(lastVisibleItemPositions);
+                    int totalItemCount = layoutManager.getItemCount();
+
+                    // 使用预加载阈值，提前加载
+                    if (lastVisibleItem >= totalItemCount - PRELOAD_THRESHOLD) {
+                        loadMoreData();
+                        isLoading = true;
+                    }
                 }
             }
         });
@@ -99,7 +170,67 @@ public class HomeFragment extends Fragment {
         return max;
     }
 
+    private void updateLayoutManager(int spanCount) {
+        StaggeredGridLayoutManager layoutManager =
+                new StaggeredGridLayoutManager(spanCount, StaggeredGridLayoutManager.VERTICAL);
+        recyclerView.setLayoutManager(layoutManager);
+    }
 
+    private String getLayoutName(int spanCount) {
+        switch (spanCount) {
+            case 1: return "单列";
+            case 2: return "双列";
+            case 3: return "三列";
+            default: return "瀑布流";
+        }
+    }
+
+    /**
+     * 获取主页专用的图片资源（以"home_"开头的图片）
+     */
+    private List<Integer> getAllHomeImageDrawables() {
+        List<Integer> drawableList = new ArrayList<>();
+
+        try {
+            Field[] fields = R.drawable.class.getFields();
+
+            for (Field field : fields) {
+                String fieldName = field.getName();
+
+                // 只加载以 "home_" 开头的图片，排除系统图标
+                if (fieldName.startsWith("home_") &&
+                        !fieldName.startsWith("ic_launcher") &&
+                        !fieldName.startsWith("ic_menu")) {
+
+                    try {
+                        int resId = field.getInt(null);
+
+                        // 验证资源是否存在
+                        try {
+                            if (getResources().getResourceName(resId) != null) {
+                                drawableList.add(resId);
+                                Log.d("HomeDrawableLoader", "Found home image: " + fieldName);
+                            }
+                        } catch (Resources.NotFoundException e) {
+                            Log.e("HomeDrawableLoader", "Resource not found: " + fieldName);
+                        }
+
+                    } catch (Exception e) {
+                        Log.e("HomeDrawableLoader", "Error accessing field: " + fieldName, e);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e("HomeDrawableLoader", "Error accessing R.drawable class: " + e.getMessage());
+        }
+
+        Log.d("HomeDrawableLoader", "Total home images found: " + drawableList.size());
+        return drawableList;
+    }
+
+    /**
+     * 获取备用图片资源（当没有主页专用图片时使用）
+     */
     private List<Integer> getAllImageDrawables() {
         List<Integer> drawableList = new ArrayList<>();
 
@@ -109,15 +240,15 @@ public class HomeFragment extends Fragment {
             for (Field field : fields) {
                 String fieldName = field.getName();
 
-                // 排除系统自带的图标
+                // 排除系统自带的图标和主页专用图标
                 if (fieldName.startsWith("ic_launcher") ||
                         fieldName.startsWith("ic_menu") ||
+                        fieldName.startsWith("home_") ||
                         fieldName.equals("ic_launcher_foreground") ||
                         fieldName.equals("ic_launcher_background")) {
                     continue;
                 }
 
-                // 尝试获取资源ID
                 try {
                     int resId = field.getInt(null);
                     drawableList.add(resId);
@@ -130,42 +261,62 @@ public class HomeFragment extends Fragment {
             Log.e("DrawableLoader", "Error accessing R.drawable class: " + e.getMessage());
         }
 
-        Log.d("DrawableLoader", "Total images found: " + drawableList.size());
+        Log.d("DrawableLoader", "Total backup images found: " + drawableList.size());
         return drawableList;
     }
 
-    private void loadData(int page) {
+    private void loadHomeData(int page) {
         Random random = new Random();
 
-        // 自动获取所有图片资源
-        List<Integer> imageResources = getAllImageDrawables();
+        // 首先尝试获取主页专用图片
+        List<Integer> imageResources = getAllHomeImageDrawables();
 
-        // 如果没有找到图片，使用默认图标
+        // 如果没有找到主页专用图片，使用备用图片
         if (imageResources.isEmpty()) {
-            imageResources.add(R.drawable.ic_launcher_foreground);
-            Log.w("HomeFragment", "No custom images found, using default icon");
+            Log.w("HomeFragment", "No home images found, using backup images");
+            imageResources = getAllImageDrawables();
+
+            // 如果备用图片也没有，使用默认图标
+            if (imageResources.isEmpty()) {
+                imageResources.add(R.drawable.ic_launcher_foreground);
+                Log.w("HomeFragment", "No backup images found, using default icon");
+            }
         }
 
-        String[] titles = {"美丽风景", "城市风光", "自然奇观", "人文建筑", "动物世界"};
-        String[] descriptions = {
-                "这是一段描述文字，展示瀑布流布局的效果",
-                "另一段描述，展示不同高度的卡片",
-                "瀑布流布局让内容展示更加生动",
-                "双列布局充分利用屏幕空间",
-                "随机高度创造视觉上的变化"
+        // 主页特有的标题和描述
+        String[] titles = {
+                "布局展示 - 单列效果",
+                "布局展示 - 双列效果",
+                "布局展示 - 三列效果",
+                "瀑布流演示",
+                "图片浏览功能",
+                "布局切换演示",
+                "应用功能介绍",
+                "使用指南"
         };
 
-        int itemsPerPage = 10;
-        for (int i = 0; i < itemsPerPage; i++) {
-            int index = (page - 1) * itemsPerPage + i;
+        String[] descriptions = {
+                "展示单列布局下的图片排列效果",
+                "展示双列布局下的瀑布流效果",
+                "展示三列布局下的紧凑排列",
+                "体验不同布局的视觉差异",
+                "点击图片可查看大图详情",
+                "实时切换单列、双列、三列布局",
+                "了解应用的各项功能和特性",
+                "学习如何使用布局切换功能"
+        };
+
+        // 使用固定的每页项目数
+        for (int i = 0; i < ITEMS_PER_PAGE; i++) {
+            int index = (page - 1) * ITEMS_PER_PAGE + i;
 
             // 从可用图片列表中随机选择
             int randomIndex = random.nextInt(imageResources.size());
             int imageRes = imageResources.get(randomIndex);
 
-            String title = titles[i % titles.length] + " " + index;
+            String title = titles[i % titles.length] + (page > 1 ? " " + index : "");
             String description = descriptions[i % descriptions.length];
-            int height = 400 + random.nextInt(300);
+            int height = 500 + random.nextInt(400); // 随机高度
 
             itemList.add(new Item(imageRes, title, description, height));
         }
@@ -176,12 +327,19 @@ public class HomeFragment extends Fragment {
     }
 
     private void loadMoreData() {
+        // 检查是否达到最大页数
+        if (currentPage >= MAX_PAGES) {
+            Toast.makeText(getContext(), "没有更多数据了", Toast.LENGTH_SHORT).show();
+            isLoading = false;
+            return;
+        }
+
         // 模拟网络请求延迟
         new Handler().postDelayed(() -> {
             currentPage++;
-            loadData(currentPage);
+            loadHomeData(currentPage);
             isLoading = false;
+            Toast.makeText(getContext(), "加载了第" + currentPage + "页数据", Toast.LENGTH_SHORT).show();
         }, 1500);
     }
 }
-

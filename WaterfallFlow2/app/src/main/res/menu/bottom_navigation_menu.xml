@@ -7,7 +7,7 @@
     <item
         android:id="@+id/navigation_dashboard"
         android:icon="@android:drawable/ic_menu_agenda"
-        android:title="仪表板" />
+        android:title="推荐" />
     <item
         android:id="@+id/navigation_profile"
         android:icon="@android:drawable/ic_menu_my_calendar"
