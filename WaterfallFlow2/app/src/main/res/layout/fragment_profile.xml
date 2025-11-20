@@ -45,7 +45,7 @@
                     android:id="@+id/user_name"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="花火哥哥"
+                    android:text="昵称"
                     android:textSize="18sp"
                     android:textStyle="bold" />
 
