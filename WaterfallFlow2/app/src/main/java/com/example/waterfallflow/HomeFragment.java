@@ -6,7 +6,6 @@ import android.os.Handler;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.Button;
 import android.widget.RadioGroup;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
@@ -28,7 +27,6 @@ public class HomeFragment extends Fragment {
     private List<Item> itemList;
     private SwipeRefreshLayout swipeRefreshLayout;
     private RadioGroup layoutRadioGroup;
-    private Button applyButton;
 
     // 当前布局列数和分页相关
     private int currentSpanCount = 2;
@@ -36,11 +34,11 @@ public class HomeFragment extends Fragment {
     private boolean isLoading = false;
     private boolean isRefreshing = false;
 
-    // 优化设置 - 方案四
-    private static final int INITIAL_PAGES = 3;     // 初始加载3页
-    private static final int ITEMS_PER_PAGE = 15;   // 每页15个项目
-    private static final int PRELOAD_THRESHOLD = 6; // 提前预加载阈值
-    private static final int MAX_PAGES = 8;         // 最大页数减少
+    // 优化设置
+    private static final int INITIAL_PAGES = 3;
+    private static final int ITEMS_PER_PAGE = 15;
+    private static final int PRELOAD_THRESHOLD = 6;
+    private static final int MAX_PAGES = 8;
 
     @Nullable
     @Override
@@ -61,12 +59,11 @@ public class HomeFragment extends Fragment {
         recyclerView = view.findViewById(R.id.recycler_view);
         swipeRefreshLayout = view.findViewById(R.id.swipe_refresh_layout);
         layoutRadioGroup = view.findViewById(R.id.layout_radio_group);
-        applyButton = view.findViewById(R.id.apply_button);
     }
 
     private void initData() {
         itemList = new ArrayList<>();
-        // 初始加载多页数据，避免频繁加载
+        // 初始加载多页数据
         for (int i = 1; i <= INITIAL_PAGES; i++) {
             loadHomeData(i);
         }
@@ -102,16 +99,17 @@ public class HomeFragment extends Fragment {
         layoutRadioGroup.setOnCheckedChangeListener((group, checkedId) -> {
             if (checkedId == R.id.radio_single_column) {
                 currentSpanCount = 1;
+                updateLayoutManager(currentSpanCount);
+                Toast.makeText(getContext(), "已切换到单列布局", Toast.LENGTH_SHORT).show();
             } else if (checkedId == R.id.radio_double_column) {
                 currentSpanCount = 2;
+                updateLayoutManager(currentSpanCount);
+                Toast.makeText(getContext(), "已切换到双列布局", Toast.LENGTH_SHORT).show();
             } else if (checkedId == R.id.radio_three_column) {
                 currentSpanCount = 3;
+                updateLayoutManager(currentSpanCount);
+                Toast.makeText(getContext(), "已切换到三列布局", Toast.LENGTH_SHORT).show();
             }
-        });
-
-        applyButton.setOnClickListener(v -> {
-            updateLayoutManager(currentSpanCount);
-            Toast.makeText(getContext(), "已切换到" + getLayoutName(currentSpanCount) + "布局", Toast.LENGTH_SHORT).show();
         });
     }
 
@@ -119,11 +117,9 @@ public class HomeFragment extends Fragment {
         swipeRefreshLayout.setOnRefreshListener(() -> {
             if (!isRefreshing) {
                 isRefreshing = true;
-                // 模拟网络请求延迟
                 new Handler().postDelayed(() -> {
                     currentPage = 1;
                     itemList.clear();
-                    // 刷新时只加载第一页，避免刷新时间过长
                     loadHomeData(1);
                     swipeRefreshLayout.setRefreshing(false);
                     isRefreshing = false;
@@ -139,7 +135,6 @@ public class HomeFragment extends Fragment {
             public void onScrolled(@NonNull RecyclerView recyclerView, int dx, int dy) {
                 super.onScrolled(recyclerView, dx, dy);
 
-                // 添加页数限制检查
                 if (currentPage >= MAX_PAGES) {
                     return;
                 }
@@ -150,7 +145,6 @@ public class HomeFragment extends Fragment {
                     int lastVisibleItem = getLastVisibleItem(lastVisibleItemPositions);
                     int totalItemCount = layoutManager.getItemCount();
 
-                    // 使用预加载阈值，提前加载
                     if (lastVisibleItem >= totalItemCount - PRELOAD_THRESHOLD) {
                         loadMoreData();
                         isLoading = true;
@@ -174,15 +168,6 @@ public class HomeFragment extends Fragment {
         StaggeredGridLayoutManager layoutManager =
                 new StaggeredGridLayoutManager(spanCount, StaggeredGridLayoutManager.VERTICAL);
         recyclerView.setLayoutManager(layoutManager);
-    }
-
-    private String getLayoutName(int spanCount) {
-        switch (spanCount) {
-            case 1: return "单列";
-            case 2: return "双列";
-            case 3: return "三列";
-            default: return "瀑布流";
-        }
     }
 
     /**
