@@ -250,22 +250,67 @@ public class HomeFragment extends Fragment {
         return drawableList;
     }
 
+    /**
+     * 获取长图资源（以"long_"开头的图片）
+     */
+    private List<Integer> getAllLongImageDrawables() {
+        List<Integer> drawableList = new ArrayList<>();
+
+        try {
+            Field[] fields = R.drawable.class.getFields();
+
+            for (Field field : fields) {
+                String fieldName = field.getName();
+
+                if (fieldName.startsWith("long_")) {
+                    try {
+                        int resId = field.getInt(null);
+                        // 验证资源是否存在
+                        try {
+                            if (getResources().getResourceName(resId) != null) {
+                                drawableList.add(resId);
+                                Log.d("HomeDrawableLoader", "Found long image: " + fieldName);
+                            }
+                        } catch (Resources.NotFoundException e) {
+                            Log.e("HomeDrawableLoader", "Resource not found: " + fieldName);
+                        }
+
+                    } catch (Exception e) {
+                        Log.e("HomeDrawableLoader", "Error accessing field: " + fieldName, e);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e("HomeDrawableLoader", "Error accessing R.drawable class: " + e.getMessage());
+        }
+
+        Log.d("HomeDrawableLoader", "Total long images found: " + drawableList.size());
+        return drawableList;
+    }
+
     private void loadHomeData(int page) {
         Random random = new Random();
 
         // 首先尝试获取主页专用图片
-        List<Integer> imageResources = getAllHomeImageDrawables();
+        List<Integer> homeImageResources = getAllHomeImageDrawables();
+        // 获取专用于全宽卡片的长图
+        List<Integer> longImageResources = getAllLongImageDrawables();
 
         // 如果没有找到主页专用图片，使用备用图片
-        if (imageResources.isEmpty()) {
+        if (homeImageResources.isEmpty()) {
             Log.w("HomeFragment", "No home images found, using backup images");
-            imageResources = getAllImageDrawables();
+            homeImageResources = getAllImageDrawables();
 
             // 如果备用图片也没有，使用默认图标
-            if (imageResources.isEmpty()) {
-                imageResources.add(R.drawable.ic_launcher_foreground);
+            if (homeImageResources.isEmpty()) {
+                homeImageResources.add(R.drawable.ic_launcher_foreground);
                 Log.w("HomeFragment", "No backup images found, using default icon");
             }
+        }
+
+        // 如果没有找到长图，则记录警告，全宽卡片功能将不会启用
+        if (longImageResources.isEmpty()) {
+            Log.w("HomeFragment", "No long images found, full-width cards will be disabled.");
         }
 
         // 主页特有的标题和描述
@@ -291,19 +336,43 @@ public class HomeFragment extends Fragment {
                 "学习如何使用布局切换功能"
         };
 
+        // 此标志用于跟踪上一个添加的项是否为全宽，以防止连续出现全宽项。
+        // 它根据添加新项之前列表中的最后一项进行初始化。
+        boolean lastItemWasFullWidth = !itemList.isEmpty() && itemList.get(itemList.size() - 1).isFullWidth();
+
         // 使用固定的每页项目数
         for (int i = 0; i < ITEMS_PER_PAGE; i++) {
             int index = (page - 1) * ITEMS_PER_PAGE + i;
 
-            // 从可用图片列表中随机选择
-            int randomIndex = random.nextInt(imageResources.size());
-            int imageRes = imageResources.get(randomIndex);
-
             String title = titles[i % titles.length] + (page > 1 ? " " + index : "");
             String description = descriptions[i % descriptions.length];
-            int height = 500 + random.nextInt(400); // 随机高度
 
-            itemList.add(new Item(imageRes, title, description, height));
+            boolean isFullWidth = false;
+            // 仅当上一个项不是全宽、存在长图资源且当前为双列布局时，才允许当前项为全宽。
+            if (!lastItemWasFullWidth && !longImageResources.isEmpty()) {
+                // 在双列布局中，一个项有20%的几率是全宽的。
+                isFullWidth = (currentSpanCount == 2) && (random.nextInt(10) < 2);
+            }
+
+            int height;
+            int imageRes;
+
+            if (isFullWidth) {
+                // 为全宽项使用固定的、较短的高度，并从长图资源中选择图片。
+                height = 450;
+                int randomIndex = random.nextInt(longImageResources.size());
+                imageRes = longImageResources.get(randomIndex);
+            } else {
+                // 常规项获得随机高度以创建交错效果，并从主页图片资源中选择。
+                height = 500 + random.nextInt(400);
+                int randomIndex = random.nextInt(homeImageResources.size());
+                imageRes = homeImageResources.get(randomIndex);
+            }
+
+            itemList.add(new Item(imageRes, title, description, height, isFullWidth));
+
+            // 为下一次迭代更新标志。
+            lastItemWasFullWidth = isFullWidth;
         }
 
         if (adapter != null) {
@@ -314,7 +383,7 @@ public class HomeFragment extends Fragment {
     private void loadMoreData() {
         // 检查是否达到最大页数
         if (currentPage >= MAX_PAGES) {
-            Toast.makeText(getContext(), "没有更多数据了", Toast.LENGTH_SHORT).show();
+            Toast.makeText(getContext(), "沒有更多數據了", Toast.LENGTH_SHORT).show();
             isLoading = false;
             return;
         }

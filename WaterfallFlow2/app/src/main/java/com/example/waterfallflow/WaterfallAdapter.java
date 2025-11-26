@@ -1,4 +1,3 @@
-// 修改WaterfallAdapter.java
 package com.example.waterfallflow;
 
 import android.view.LayoutInflater;
@@ -7,8 +6,8 @@ import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 import androidx.annotation.NonNull;
-import androidx.fragment.app.FragmentActivity;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.StaggeredGridLayoutManager;
 import java.util.List;
 
 public class WaterfallAdapter extends RecyclerView.Adapter<WaterfallAdapter.ViewHolder> {
@@ -49,6 +48,13 @@ public class WaterfallAdapter extends RecyclerView.Adapter<WaterfallAdapter.View
         // 设置随机高度，实现瀑布流效果
         ViewGroup.LayoutParams layoutParams = holder.itemView.getLayoutParams();
         layoutParams.height = item.getHeight();
+
+        // Handle full-width items
+        if (layoutParams instanceof StaggeredGridLayoutManager.LayoutParams) {
+            StaggeredGridLayoutManager.LayoutParams sglp = (StaggeredGridLayoutManager.LayoutParams) layoutParams;
+            sglp.setFullSpan(item.isFullWidth());
+        }
+
         holder.itemView.setLayoutParams(layoutParams);
 
         // 设置点击事件
