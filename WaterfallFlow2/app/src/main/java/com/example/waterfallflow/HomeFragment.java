@@ -1,8 +1,11 @@
 package com.example.waterfallflow;
 
+import android.app.Activity;
+import android.content.Context;
 import android.content.res.Resources;
 import android.os.Bundle;
 import android.os.Handler;
+import android.util.DisplayMetrics;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -73,7 +76,8 @@ public class HomeFragment extends Fragment {
     private void setupRecyclerView() {
         updateLayoutManager(currentSpanCount);
 
-        adapter = new WaterfallAdapter(itemList);
+        int singleColumnWidth = calculateSingleColumnWidth();
+        adapter = new WaterfallAdapter(itemList, singleColumnWidth);
 
         // 设置点击监听器
         adapter.setOnItemClickListener((item, position) -> {
@@ -298,12 +302,15 @@ public class HomeFragment extends Fragment {
             // 从可用图片列表中随机选择
             int randomIndex = random.nextInt(imageResources.size());
             int imageRes = imageResources.get(randomIndex);
+            ImageUtils.Size imageSize = ImageUtils.getImageSize(requireContext(), imageRes);
 
             String title = titles[i % titles.length] + (page > 1 ? " " + index : "");
             String description = descriptions[i % descriptions.length];
-            int height = 500 + random.nextInt(400); // 随机高度
+            // int height = 500 + random.nextInt(400); // 随机高度
 
-            itemList.add(new Item(imageRes, title, description, height));
+            Item curItem = new Item(index % 5 == 0 ? Item.TYPE_FULL_WIDTH : Item.TYPE_NORMAL, imageRes, title, description);
+            curItem.setImageSize(imageSize.width, imageSize.height);
+            itemList.add(curItem);
         }
 
         if (adapter != null) {
@@ -326,5 +333,21 @@ public class HomeFragment extends Fragment {
             isLoading = false;
             Toast.makeText(getContext(), "加载了第" + currentPage + "页数据", Toast.LENGTH_SHORT).show();
         }, 1500);
+    }
+
+    private int calculateSingleColumnWidth() {
+        if (!isAdded() || getActivity() == null) {
+            // Fragment 未附加到 Activity，返回默认值
+            return 300; // 默认宽度
+        }
+
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        getActivity().getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+        int screenWidth = displayMetrics.widthPixels;
+
+        int recyclerViewPadding = getResources().getDimensionPixelSize(R.dimen.recycler_view_padding);
+        int cardMargin = getResources().getDimensionPixelSize(R.dimen.card_margin);
+
+        return (screenWidth - recyclerViewPadding * 2 - cardMargin * 3) / 2;
     }
 }
