@@ -43,19 +43,26 @@ public class HomeFragment extends Fragment {
     private static final int PRELOAD_THRESHOLD = 6;
     private static final int MAX_PAGES = 8;
 
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        initData();
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_home, container, false);
+        return inflater.inflate(R.layout.fragment_home, container, false);
+    }
 
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
         initView(view);
-        initData();
         setupRecyclerView();
         setupLayoutSwitcher();
         setupRefresh();
         setupLoadMore();
-
-        return view;
     }
 
     private void initView(View view) {
@@ -76,8 +83,7 @@ public class HomeFragment extends Fragment {
     private void setupRecyclerView() {
         updateLayoutManager(currentSpanCount);
 
-        int singleColumnWidth = calculateSingleColumnWidth();
-        adapter = new WaterfallAdapter(itemList, singleColumnWidth);
+        adapter = new WaterfallAdapter(itemList);
 
         // 设置点击监听器
         adapter.setOnItemClickListener((item, position) -> {
@@ -273,27 +279,27 @@ public class HomeFragment extends Fragment {
         }
 
         // 主页特有的标题和描述
-        String[] titles = {
-                "布局展示 - 单列效果",
-                "布局展示 - 双列效果",
-                "布局展示 - 三列效果",
-                "瀑布流演示",
-                "图片浏览功能",
-                "布局切换演示",
-                "应用功能介绍",
-                "使用指南"
-        };
-
-        String[] descriptions = {
-                "展示单列布局下的图片排列效果",
-                "展示双列布局下的瀑布流效果",
-                "展示三列布局下的紧凑排列",
-                "体验不同布局的视觉差异",
-                "点击图片可查看大图详情",
-                "实时切换单列、双列、三列布局",
-                "了解应用的各项功能和特性",
-                "学习如何使用布局切换功能"
-        };
+//        String[] titles = {
+//                "布局展示 - 单列效果",
+//                "布局展示 - 双列效果",
+//                "布局展示 - 三列效果",
+//                "瀑布流演示",
+//                "图片浏览功能",
+//                "布局切换演示",
+//                "应用功能介绍",
+//                "使用指南"
+//        };
+//
+//        String[] descriptions = {
+//                "展示单列布局下的图片排列效果",
+//                "展示双列布局下的瀑布流效果",
+//                "展示三列布局下的紧凑排列",
+//                "体验不同布局的视觉差异",
+//                "点击图片可查看大图详情",
+//                "实时切换单列、双列、三列布局",
+//                "了解应用的各项功能和特性",
+//                "学习如何使用布局切换功能"
+//        };
 
         // 使用固定的每页项目数
         for (int i = 0; i < ITEMS_PER_PAGE; i++) {
@@ -302,14 +308,18 @@ public class HomeFragment extends Fragment {
             // 从可用图片列表中随机选择
             int randomIndex = random.nextInt(imageResources.size());
             int imageRes = imageResources.get(randomIndex);
-            ImageUtils.Size imageSize = ImageUtils.getImageSize(requireContext(), imageRes);
 
-            String title = titles[i % titles.length] + (page > 1 ? " " + index : "");
-            String description = descriptions[i % descriptions.length];
+//            String title = titles[i % titles.length] + (page > 1 ? " " + index : "");
+//            String description = descriptions[i % descriptions.length];
             // int height = 500 + random.nextInt(400); // 随机高度
 
-            Item curItem = new Item(index % 5 == 0 ? Item.TYPE_FULL_WIDTH : Item.TYPE_NORMAL, imageRes, title, description);
-            curItem.setImageSize(imageSize.width, imageSize.height);
+            Item curItem = new Item(
+                    Item.TYPE_NORMAL,
+                    imageRes,
+                    "卡片标题 " + (index + 1),
+                    "这是第" + (index + 1) + "个卡片的描述文字。"
+            );
+
             itemList.add(curItem);
         }
 
@@ -333,21 +343,5 @@ public class HomeFragment extends Fragment {
             isLoading = false;
             Toast.makeText(getContext(), "加载了第" + currentPage + "页数据", Toast.LENGTH_SHORT).show();
         }, 1500);
-    }
-
-    private int calculateSingleColumnWidth() {
-        if (!isAdded() || getActivity() == null) {
-            // Fragment 未附加到 Activity，返回默认值
-            return 300; // 默认宽度
-        }
-
-        DisplayMetrics displayMetrics = new DisplayMetrics();
-        getActivity().getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
-        int screenWidth = displayMetrics.widthPixels;
-
-        int recyclerViewPadding = getResources().getDimensionPixelSize(R.dimen.recycler_view_padding);
-        int cardMargin = getResources().getDimensionPixelSize(R.dimen.card_margin);
-
-        return (screenWidth - recyclerViewPadding * 2 - cardMargin * 3) / 2;
     }
 }
