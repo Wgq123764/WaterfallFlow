@@ -35,18 +35,25 @@ public class DashboardFragment extends Fragment {
     private static final int PRELOAD_THRESHOLD = 8; // 提前预加载阈值
     private static final int MAX_PAGES = 8;         // 最大页数
 
+    @Override
+    public void onCreate(@Nullable Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        initData();
+    }
+
     @Nullable
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_dashboard, container, false);
+        return inflater.inflate(R.layout.fragment_dashboard, container, false);
+    }
 
+    @Override
+    public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
+        super.onViewCreated(view, savedInstanceState);
         initView(view);
-        initData();
         setupRecyclerView();
         setupRefresh();
         setupLoadMore();
-
-        return view;
     }
 
     private void initView(View view) {
@@ -68,21 +75,11 @@ public class DashboardFragment extends Fragment {
                 new StaggeredGridLayoutManager(2, StaggeredGridLayoutManager.VERTICAL);
         recyclerView.setLayoutManager(layoutManager);
 
-        adapter = new WaterfallAdapter(itemList);
-
-        adapter.setOnItemClickListener((item, position) -> {
-            ImageDetailFragment detailFragment = ImageDetailFragment.newInstance(
-                    item.getImageResId(),
-                    item.getTitle()
-            );
-
-            getParentFragmentManager().beginTransaction()
-                    .setReorderingAllowed(true)
-                    .addToBackStack("image_detail")
-                    .replace(R.id.fragment_container, detailFragment)
-                    .commit();
+        adapter = new WaterfallAdapter(getContext(), itemList);
+        adapter.setOnItemClickListener((Item item) -> {
+            ImageDialogFragment dialog = ImageDialogFragment.newInstance(item.getImageResId(), item.getTitle());
+            dialog.show(getParentFragmentManager(), "image_dialog");
         });
-
         recyclerView.setAdapter(adapter);
     }
 
